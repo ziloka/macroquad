@@ -1,5 +1,7 @@
 use std::{any::Any, marker::PhantomData, ops::Drop};
 
+use crate::camera::Camera2D;
+
 #[rustfmt::skip]
 pub trait Node {
     fn ready(_node: RefMut<Self>) where Self: Sized {}
@@ -298,7 +300,7 @@ struct Scene {
     dense_ongoing: Vec<Result<Id, Id>>,
     nodes: Vec<Option<Cell>>,
     arena: bumpalo::Bump,
-    camera: Option<Box<dyn crate::camera::Camera>>,
+    camera: [Box<dyn crate::camera::Camera>; 2],
 
     free_nodes: Vec<Cell>,
 }
@@ -311,7 +313,7 @@ impl Scene {
             nodes: Vec::new(),
             arena: bumpalo::Bump::new(),
             free_nodes: Vec::new(),
-            camera: None,
+            camera: [Box::new(Camera2D::default()), Box::new(Camera2D::default())],
         }
     }
 
@@ -441,15 +443,15 @@ impl Scene {
             unsafe { (*cell.update)(node) };
         }
 
-        if let Some(ref camera) = self.camera {
+        for camera in self.camera.iter() {
             crate::prelude::set_camera(&**camera);
-        }
-        for node in &mut self.iter() {
-            let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
-            let node: RefMut<()> = node.to_typed::<()>();
-            unsafe { (*cell.draw)(node) };
-        }
-        if self.camera.is_some() {
+
+            for node in &mut self.iter() {
+                let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
+                let node: RefMut<()> = node.to_typed::<()>();
+                unsafe { (*cell.draw)(node) };
+            }
+
             crate::prelude::set_default_camera();
         }
 
@@ -536,8 +538,12 @@ pub(crate) fn get_untyped_node(handle: HandleUntyped) -> Option<RefMutAny<'stati
     unsafe { get_scene() }.get_any(handle)
 }
 
-pub fn set_camera(camera: impl crate::camera::Camera + Clone + 'static) {
-    unsafe { get_scene() }.camera = Some(Box::new(camera.clone()));
+pub fn set_camera_1(camera: impl crate::camera::Camera + Clone + 'static) {
+    unsafe { get_scene() }.camera[0] = Box::new(camera.clone());
+}
+
+pub fn set_camera_2(camera: impl crate::camera::Camera + Clone + 'static) {
+    unsafe { get_scene() }.camera[1] = Box::new(camera.clone());
 }
 
 pub fn add_node<T: Node>(node: T) -> Handle<T> {

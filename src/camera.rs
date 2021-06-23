@@ -6,12 +6,13 @@ use crate::{
     texture::RenderTarget,
     window::{screen_height, screen_width},
 };
-use glam::{vec2, vec3, Mat4, Vec2, Vec3};
+use glam::{vec2, vec3, Mat4, Vec2};
 
 pub trait Camera {
     fn matrix(&self) -> Mat4;
     fn depth_enabled(&self) -> bool;
     fn render_pass(&self) -> Option<miniquad::RenderPass>;
+    fn viewport(&self) -> Option<(i32, i32, i32, i32)>;
 }
 
 #[derive(Clone, Copy)]
@@ -28,6 +29,8 @@ pub struct Camera2D {
     /// If "render_target" is set - camera will render to texture
     /// otherwise to the screen
     pub render_target: Option<RenderTarget>,
+
+    pub viewport: Option<(i32, i32, i32, i32)>,
 }
 
 impl Camera2D {
@@ -42,6 +45,7 @@ impl Camera2D {
             rotation: 0.,
 
             render_target: None,
+            viewport: None,
         }
     }
 }
@@ -55,6 +59,7 @@ impl Default for Camera2D {
             rotation: 0.,
 
             render_target: None,
+            viewport: None,
         }
     }
 }
@@ -92,6 +97,10 @@ impl Camera for Camera2D {
     fn render_pass(&self) -> Option<miniquad::RenderPass> {
         self.render_target.map(|rt| rt.render_pass)
     }
+
+    fn viewport(&self) -> Option<(i32, i32, i32, i32)> {
+        self.viewport
+    }
 }
 
 impl Camera2D {
@@ -127,74 +136,74 @@ pub enum Projection {
     Orthographics,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Camera3D {
-    /// Camera position
-    pub position: Vec3,
-    /// Camera target it looks-at
-    pub target: Vec3,
-    /// Camera up vector (rotation over its axis)
-    pub up: Vec3,
-    /// Camera field-of-view aperture in Y (degrees)
-    /// in perspective, used as near plane width in orthographic
-    pub fovy: f32,
-    /// Screen aspect ratio
-    /// By default aspect is calculated with screen_width() / screen_height() on each frame
-    pub aspect: Option<f32>,
-    /// Camera projection type, perspective or orthographics
-    pub projection: Projection,
+// #[derive(Debug, Clone, Copy)]
+// pub struct Camera3D {
+//     /// Camera position
+//     pub position: Vec3,
+//     /// Camera target it looks-at
+//     pub target: Vec3,
+//     /// Camera up vector (rotation over its axis)
+//     pub up: Vec3,
+//     /// Camera field-of-view aperture in Y (degrees)
+//     /// in perspective, used as near plane width in orthographic
+//     pub fovy: f32,
+//     /// Screen aspect ratio
+//     /// By default aspect is calculated with screen_width() / screen_height() on each frame
+//     pub aspect: Option<f32>,
+//     /// Camera projection type, perspective or orthographics
+//     pub projection: Projection,
 
-    /// If "render_target" is set - camera will render to texture
-    /// otherwise to the screen
-    pub render_target: Option<RenderTarget>,
-}
+//     /// If "render_target" is set - camera will render to texture
+//     /// otherwise to the screen
+//     pub render_target: Option<RenderTarget>,
+// }
 
-impl Default for Camera3D {
-    fn default() -> Camera3D {
-        Camera3D {
-            position: vec3(0., -10., 0.),
-            target: vec3(0., 0., 0.),
-            aspect: None,
-            up: vec3(0., 0., 1.),
-            fovy: 45.,
-            projection: Projection::Perspective,
-            render_target: None,
-        }
-    }
-}
+// impl Default for Camera3D {
+//     fn default() -> Camera3D {
+//         Camera3D {
+//             position: vec3(0., -10., 0.),
+//             target: vec3(0., 0., 0.),
+//             aspect: None,
+//             up: vec3(0., 0., 1.),
+//             fovy: 45.,
+//             projection: Projection::Perspective,
+//             render_target: None,
+//         }
+//     }
+// }
 
-impl Camera3D {
-    const Z_NEAR: f32 = 0.01;
-    const Z_FAR: f32 = 10000.0;
-}
+// impl Camera3D {
+//     const Z_NEAR: f32 = 0.01;
+//     const Z_FAR: f32 = 10000.0;
+// }
 
-impl Camera for Camera3D {
-    fn matrix(&self) -> Mat4 {
-        let aspect = self.aspect.unwrap_or(screen_width() / screen_height());
+// impl Camera for Camera3D {
+//     fn matrix(&self) -> Mat4 {
+//         let aspect = self.aspect.unwrap_or(screen_width() / screen_height());
 
-        match self.projection {
-            Projection::Perspective => {
-                Mat4::perspective_rh_gl(self.fovy, aspect, Self::Z_NEAR, Self::Z_FAR)
-                    * Mat4::look_at_rh(self.position, self.target, self.up)
-            }
-            Projection::Orthographics => {
-                let top = self.fovy / 2.0;
-                let right = top * aspect;
+//         match self.projection {
+//             Projection::Perspective => {
+//                 Mat4::perspective_rh_gl(self.fovy, aspect, Self::Z_NEAR, Self::Z_FAR)
+//                     * Mat4::look_at_rh(self.position, self.target, self.up)
+//             }
+//             Projection::Orthographics => {
+//                 let top = self.fovy / 2.0;
+//                 let right = top * aspect;
 
-                Mat4::orthographic_rh_gl(-right, right, -top, top, Self::Z_NEAR, Self::Z_FAR)
-                    * Mat4::look_at_rh(self.position, self.target, self.up)
-            }
-        }
-    }
+//                 Mat4::orthographic_rh_gl(-right, right, -top, top, Self::Z_NEAR, Self::Z_FAR)
+//                     * Mat4::look_at_rh(self.position, self.target, self.up)
+//             }
+//         }
+//     }
 
-    fn depth_enabled(&self) -> bool {
-        true
-    }
+//     fn depth_enabled(&self) -> bool {
+//         true
+//     }
 
-    fn render_pass(&self) -> Option<miniquad::RenderPass> {
-        self.render_target.map(|rt| rt.render_pass)
-    }
-}
+//     fn render_pass(&self) -> Option<miniquad::RenderPass> {
+//         self.render_target.map(|rt| rt.render_pass)
+//     }
+// }
 
 /// Set active 2D or 3D camera
 pub fn set_camera(camera: &dyn Camera) {
@@ -204,6 +213,7 @@ pub fn set_camera(camera: &dyn Camera) {
     context.perform_render_passes();
 
     context.gl.render_pass(camera.render_pass());
+    context.gl.viewport(camera.viewport());
     context.gl.depth_test(camera.depth_enabled());
     context.camera_matrix = Some(camera.matrix());
 }
