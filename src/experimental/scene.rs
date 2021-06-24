@@ -300,7 +300,8 @@ struct Scene {
     dense_ongoing: Vec<Result<Id, Id>>,
     nodes: Vec<Option<Cell>>,
     arena: bumpalo::Bump,
-    camera: [Box<dyn crate::camera::Camera>; 2],
+    camera: [Camera2D; 2],
+    camera_pos: crate::Vec2,
 
     free_nodes: Vec<Cell>,
 }
@@ -313,7 +314,8 @@ impl Scene {
             nodes: Vec::new(),
             arena: bumpalo::Bump::new(),
             free_nodes: Vec::new(),
-            camera: [Box::new(Camera2D::default()), Box::new(Camera2D::default())],
+            camera: [Camera2D::default(), Camera2D::default()],
+            camera_pos: crate::vec2(0., 0.),
         }
     }
 
@@ -444,7 +446,8 @@ impl Scene {
         }
 
         for camera in self.camera.iter() {
-            crate::prelude::set_camera(&**camera);
+            self.camera_pos = camera.target;
+            crate::prelude::set_camera(&*camera);
 
             for node in &mut self.iter() {
                 let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
@@ -527,7 +530,9 @@ pub fn clear() {
 
 /// Get node and panic if the node is borrowed or deleted
 pub fn get_node<T: Node>(handle: Handle<T>) -> RefMut<T> {
-    unsafe { get_scene() }.get(handle).unwrap()
+    unsafe { get_scene() }
+        .get(handle)
+        .expect(&format!("No such node: {:?}", handle.id))
 }
 
 pub fn try_get_node<T: Node>(handle: Handle<T>) -> Option<RefMut<T>> {
@@ -538,12 +543,16 @@ pub(crate) fn get_untyped_node(handle: HandleUntyped) -> Option<RefMutAny<'stati
     unsafe { get_scene() }.get_any(handle)
 }
 
-pub fn set_camera_1(camera: impl crate::camera::Camera + Clone + 'static) {
-    unsafe { get_scene() }.camera[0] = Box::new(camera.clone());
+pub fn camera_pos() -> crate::Vec2 {
+    unsafe { get_scene() }.camera_pos
 }
 
-pub fn set_camera_2(camera: impl crate::camera::Camera + Clone + 'static) {
-    unsafe { get_scene() }.camera[1] = Box::new(camera.clone());
+pub fn set_camera_1(camera: Camera2D) {
+    unsafe { get_scene() }.camera[0] = camera.clone();
+}
+
+pub fn set_camera_2(camera: Camera2D) {
+    unsafe { get_scene() }.camera[1] = camera.clone();
 }
 
 pub fn add_node<T: Node>(node: T) -> Handle<T> {

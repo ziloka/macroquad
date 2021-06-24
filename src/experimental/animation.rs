@@ -50,6 +50,10 @@ impl AnimatedSprite {
         self.current_animation = animation;
     }
 
+    pub fn current_animation(&self) -> usize {
+        self.current_animation
+    }
+
     pub fn set_frame(&mut self, frame: u32) {
         self.frame = frame;
     }
