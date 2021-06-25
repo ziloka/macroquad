@@ -796,6 +796,15 @@ impl QuadGl {
         self.state.viewport = viewport;
     }
 
+    pub fn get_viewport(&self) -> (i32, i32, i32, i32) {
+        self.state.viewport.unwrap_or((
+            0,
+            0,
+            crate::window::screen_width() as _,
+            crate::window::screen_height() as _,
+        ))
+    }
+
     pub fn push_model_matrix(&mut self, matrix: glam::Mat4) {
         self.state.model_stack.push(self.state.model() * matrix);
     }
