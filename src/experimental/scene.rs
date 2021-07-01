@@ -41,7 +41,7 @@ pub struct Handle<T: 'static> {
 unsafe impl<T: 'static> Send for Handle<T> {}
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct HandleUntyped(Id);
+pub struct HandleUntyped(Id);
 
 impl<T: 'static> std::fmt::Debug for Handle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -62,16 +62,22 @@ impl<T: 'static> Clone for Handle<T> {
 
 impl<T: 'static> Copy for Handle<T> {}
 
-impl<T: 'static> Handle<T> {
+impl<T> Handle<T> {
     pub fn null() -> Handle<T> {
         Handle {
             id: None,
             _marker: PhantomData,
         }
     }
+
+    pub fn untyped(&self) -> HandleUntyped {
+        HandleUntyped(self.id.unwrap())
+    }
+
+    pub fn as_trait<T1: ?Sized>(&self) {}
 }
 
-pub(crate) struct Lens<T> {
+pub struct Lens<T> {
     handle: HandleUntyped,
     offset: isize,
     _marker: PhantomData<T>,
@@ -86,7 +92,7 @@ impl<T> Lens<T> {
 }
 
 impl<T> Handle<T> {
-    pub(crate) fn lens<F, T1>(&self, f: F) -> Lens<T1>
+    pub fn lens<F, T1>(&self, f: F) -> Lens<T1>
     where
         F: for<'r> FnOnce(&'r mut T) -> &'r mut T1,
     {
@@ -187,7 +193,7 @@ impl<'a> RefMutAny<'a> {
         std::mem::forget(self);
     }
 
-    fn to_typed<T>(self) -> RefMut<T> {
+    pub fn to_typed<T>(self) -> RefMut<T> {
         let res = RefMut {
             data: self.data as *mut T,
             handle: Handle {
@@ -539,7 +545,7 @@ pub fn try_get_node<T: Node>(handle: Handle<T>) -> Option<RefMut<T>> {
     unsafe { get_scene() }.get(handle)
 }
 
-pub(crate) fn get_untyped_node(handle: HandleUntyped) -> Option<RefMutAny<'static>> {
+pub fn get_untyped_node(handle: HandleUntyped) -> Option<RefMutAny<'static>> {
     unsafe { get_scene() }.get_any(handle)
 }
 
