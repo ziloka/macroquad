@@ -306,7 +306,7 @@ struct Scene {
     dense_ongoing: Vec<Result<Id, Id>>,
     nodes: Vec<Option<Cell>>,
     arena: bumpalo::Bump,
-    camera: [Camera2D; 2],
+    camera: [Option<Camera2D>; 2],
     camera_pos: crate::Vec2,
 
     free_nodes: Vec<Cell>,
@@ -320,7 +320,7 @@ impl Scene {
             nodes: Vec::new(),
             arena: bumpalo::Bump::new(),
             free_nodes: Vec::new(),
-            camera: [Camera2D::default(), Camera2D::default()],
+            camera: [Some(Camera2D::default()), None],
             camera_pos: crate::vec2(0., 0.),
         }
     }
@@ -452,16 +452,18 @@ impl Scene {
         }
 
         for camera in self.camera.iter() {
-            self.camera_pos = camera.target;
-            crate::prelude::set_camera(&*camera);
+            if let Some(camera) = camera {
+                self.camera_pos = camera.target;
+                crate::prelude::set_camera(&*camera);
 
-            for node in &mut self.iter() {
-                let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
-                let node: RefMut<()> = node.to_typed::<()>();
-                unsafe { (*cell.draw)(node) };
+                for node in &mut self.iter() {
+                    let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
+                    let node: RefMut<()> = node.to_typed::<()>();
+                    unsafe { (*cell.draw)(node) };
+                }
+
+                crate::prelude::set_default_camera();
             }
-
-            crate::prelude::set_default_camera();
         }
 
         for id in self.dense_ongoing.drain(0..) {
@@ -554,11 +556,11 @@ pub fn camera_pos() -> crate::Vec2 {
 }
 
 pub fn set_camera_1(camera: Camera2D) {
-    unsafe { get_scene() }.camera[0] = camera.clone();
+    unsafe { get_scene() }.camera[0] = Some(camera);
 }
 
 pub fn set_camera_2(camera: Camera2D) {
-    unsafe { get_scene() }.camera[1] = camera.clone();
+    unsafe { get_scene() }.camera[1] = Some(camera);
 }
 
 pub fn add_node<T: Node>(node: T) -> Handle<T> {
