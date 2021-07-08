@@ -17,6 +17,7 @@ fn get_profiler() -> &'static mut Profiler {
             capture: false,
             drawcalls: vec![],
             strings: vec![],
+            named_strings: HashMap::new(),
         })
     }
 }
@@ -199,6 +200,7 @@ struct Profiler {
     enable_request: Option<bool>,
     drawcalls: Vec<DrawCallTelemetry>,
     strings: Vec<String>,
+    named_strings: HashMap<String, String>,
 }
 
 impl Profiler {
@@ -318,7 +320,20 @@ impl<'a> Drop for LogTimeGuard<'a> {
 }
 
 pub fn log_string(string: &str) {
-    get_profiler().strings.push(string.to_owned());
+    let profiler = get_profiler();
+    if profiler
+        .strings
+        .last()
+        .map_or(true, |last_log| last_log != string)
+    {
+        profiler.strings.push(string.to_owned());
+    }
+}
+
+pub fn fixed_string(name: &str, string: &str) {
+    get_profiler()
+        .named_strings
+        .insert(name.to_owned(), string.to_owned());
 }
 
 pub fn drawcalls() -> Vec<DrawCallTelemetry> {
@@ -327,6 +342,10 @@ pub fn drawcalls() -> Vec<DrawCallTelemetry> {
 
 pub fn strings() -> Vec<String> {
     get_profiler().strings.clone()
+}
+
+pub fn named_strings() -> HashMap<String, String> {
+    get_profiler().named_strings.clone()
 }
 
 pub fn capture_frame() {

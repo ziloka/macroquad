@@ -48,6 +48,9 @@ impl AnimatedSprite {
 
     pub fn set_animation(&mut self, animation: usize) {
         self.current_animation = animation;
+
+        let animation = &self.animations[self.current_animation];
+        self.frame %= animation.frames;
     }
 
     pub fn current_animation(&self) -> usize {

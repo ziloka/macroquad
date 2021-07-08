@@ -6,6 +6,7 @@ use crate::camera::Camera2D;
 pub trait Node {
     fn ready(_node: RefMut<Self>) where Self: Sized {}
     fn update(_node: RefMut<Self>) where Self: Sized  {}
+    fn fixed_update(_node: RefMut<Self>) where Self: Sized  {}
     fn draw(_node: RefMut<Self>) where Self: Sized  {}
 }
 
@@ -245,6 +246,7 @@ struct Cell {
     vtable: *mut (),
     ready: *const fn(RefMut<()>),
     update: *const fn(RefMut<()>),
+    fixed_update: *const fn(RefMut<()>),
     draw: *const fn(RefMut<()>),
     data_len: usize,
     permanent: bool,
@@ -267,6 +269,9 @@ impl Cell {
             update: unsafe {
                 std::mem::transmute(&(Node::update as fn(RefMut<T>)) as *const fn(RefMut<T>))
             },
+            fixed_update: unsafe {
+                std::mem::transmute(&(Node::fixed_update as fn(RefMut<T>)) as *const fn(RefMut<T>))
+            },
             draw: unsafe {
                 std::mem::transmute(&(Node::draw as fn(RefMut<T>)) as *const fn(RefMut<T>))
             },
@@ -286,6 +291,9 @@ impl Cell {
             unsafe { std::mem::transmute(&(Node::ready as fn(RefMut<T>)) as *const fn(RefMut<T>)) };
         self.update = unsafe {
             std::mem::transmute(&(Node::update as fn(RefMut<T>)) as *const fn(RefMut<T>))
+        };
+        self.fixed_update = unsafe {
+            std::mem::transmute(&(Node::fixed_update as fn(RefMut<T>)) as *const fn(RefMut<T>))
         };
         self.draw =
             unsafe { std::mem::transmute(&(Node::draw as fn(RefMut<T>)) as *const fn(RefMut<T>)) };
@@ -309,6 +317,10 @@ struct Scene {
     camera: [Option<Camera2D>; 2],
     camera_pos: crate::Vec2,
 
+    acc: f64,
+    current_time: f64,
+    in_fixed_update: bool,
+
     free_nodes: Vec<Cell>,
 }
 
@@ -322,6 +334,9 @@ impl Scene {
             free_nodes: Vec::new(),
             camera: [Some(Camera2D::default()), None],
             camera_pos: crate::vec2(0., 0.),
+            acc: 0.0,
+            current_time: crate::time::get_time(),
+            in_fixed_update: false,
         }
     }
 
@@ -445,10 +460,28 @@ impl Scene {
             }
         }
 
+        let new_time = crate::time::get_time();
+
+        let frame_time = new_time - self.current_time;
+        self.current_time = new_time;
+        self.acc += frame_time;
+
         for node in &mut self.iter() {
             let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
             let node: RefMut<()> = node.to_typed::<()>();
             unsafe { (*cell.update)(node) };
+        }
+
+        while self.acc > CONST_FPS {
+            self.acc -= CONST_FPS;
+            for node in &mut self.iter() {
+                let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
+                let node: RefMut<()> = node.to_typed::<()>();
+
+                self.in_fixed_update = true;
+                unsafe { (*cell.fixed_update)(node) };
+                self.in_fixed_update = false;
+            }
         }
 
         for camera in self.camera.iter() {
@@ -587,4 +620,14 @@ pub fn find_nodes_by_type<T: Any>() -> impl Iterator<Item = RefMut<T>> {
         .iter()
         .filter(|node| node.is::<T>())
         .map(|node| node.to_typed())
+}
+
+const CONST_FPS: f64 = 1.0 / 60.;
+
+pub(crate) fn in_fixed_update() -> bool {
+    unsafe { get_scene() }.in_fixed_update
+}
+
+pub(crate) fn fixed_frame_time() -> f32 {
+    CONST_FPS as _
 }
