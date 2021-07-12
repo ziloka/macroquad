@@ -462,7 +462,17 @@ impl Scene {
 
         let new_time = crate::time::get_time();
 
-        let frame_time = new_time - self.current_time;
+        let mut frame_time = new_time - self.current_time;
+
+        // https://medium.com/@tglaiel/how-to-make-your-game-run-at-60fps-24c61210fe75
+        if (frame_time - 1.0 / 1200.0).abs() < 0.0002 {
+            frame_time = 1.0 / 120.0;
+        } else if (frame_time - 1.0 / 60.0).abs() < 0.0002 {
+            frame_time = 1.0 / 60.0;
+        } else if (frame_time - 1.0 / 30.0).abs() < 0.0002 {
+            frame_time = 1.0 / 30.0;
+        }
+
         self.current_time = new_time;
         self.acc += frame_time;
 
