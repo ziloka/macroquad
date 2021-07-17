@@ -60,7 +60,7 @@ impl<'a> TreeNode<'a> {
             *opened ^= 1;
         }
 
-        context.window.painter.draw_element_label(
+        context.window.painter.draw_element_label2(
             &context.style.label_style,
             pos,
             if *opened == 0 { "+" } else { "-" },
@@ -69,7 +69,7 @@ impl<'a> TreeNode<'a> {
                 ..Default::default()
             },
         );
-        context.window.painter.draw_element_label(
+        context.window.painter.draw_element_label2(
             &context.style.label_style,
             pos + vec2(10., 0.),
             &*self.label,

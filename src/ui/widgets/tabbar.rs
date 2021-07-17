@@ -1,5 +1,5 @@
 use crate::{
-    math::{Rect, Vec2},
+    math::{vec2, Rect, Vec2},
     ui::{ElementState, Id, Layout, Ui},
 };
 
@@ -67,15 +67,10 @@ impl Tabbar<'_> {
                 },
             );
 
-            let text_width = context
-                .window
-                .painter
-                .element_size(&context.style.tabbar_style, label)
-                .x;
-
             context.window.painter.draw_element_label(
                 &context.style.tabbar_style,
-                pos + Vec2::new(width * n as f32 + (width - text_width) / 2., 0.0),
+                pos + vec2(width * n as f32, 0.0),
+                vec2(width, self.size.y),
                 label,
                 ElementState {
                     focused: context.focused,

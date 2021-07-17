@@ -25,6 +25,7 @@ pub struct StyleBuilder {
     color_selected: Color,
     color_selected_hovered: Color,
     color_clicked: Color,
+    reverse_background_z: bool,
 }
 
 impl StyleBuilder {
@@ -48,6 +49,7 @@ impl StyleBuilder {
             margin: None,
             background_hovered: None,
             background_clicked: None,
+            reverse_background_z: false,
         }
     }
 
@@ -144,6 +146,13 @@ impl StyleBuilder {
         }
     }
 
+    pub fn reverse_background_z(self, reverse_background_z: bool) -> StyleBuilder {
+        StyleBuilder {
+            reverse_background_z,
+            ..self
+        }
+    }
+
     pub fn build(self) -> Style {
         let mut atlas = self.atlas.borrow_mut();
 
@@ -180,6 +189,7 @@ impl StyleBuilder {
             font: self.font,
             text_color: self.text_color,
             font_size: self.font_size,
+            reverse_background_z: self.reverse_background_z,
         }
     }
 }
@@ -208,6 +218,7 @@ pub struct Style {
     pub(crate) font: Rc<RefCell<FontInternal>>,
     pub(crate) text_color: Color,
     pub(crate) font_size: u16,
+    pub(crate) reverse_background_z: bool,
 }
 
 impl Style {
@@ -227,6 +238,7 @@ impl Style {
             color_selected: Color::from_rgba(255, 255, 255, 255),
             color_selected_hovered: Color::from_rgba(255, 255, 255, 255),
             color_inactive: None,
+            reverse_background_z: false,
         }
     }
 

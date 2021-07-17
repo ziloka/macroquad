@@ -1,6 +1,6 @@
 use crate::{
     math::{vec2, Rect, Vec2},
-    ui::{ElementState, Id, Layout, Ui},
+    ui::{ElementState, Id, Layout, Ui, UiContent},
 };
 
 pub struct Checkbox<'a> {
@@ -23,7 +23,7 @@ impl<'a> Checkbox<'a> {
         let label_size = context
             .window
             .painter
-            .element_size(&context.style.label_style, self.label);
+            .content_with_margins_size(&context.style.label_style, &UiContent::Label(self.label));
         let size = vec2(
             context.window.cursor.area.w - context.style.margin * 2. - context.window.cursor.ident,
             label_size.y.max(22.),
@@ -103,7 +103,7 @@ impl<'a> Checkbox<'a> {
         let context = ui.get_active_window_context();
 
         if self.label.is_empty() == false {
-            context.window.painter.draw_element_label(
+            context.window.painter.draw_element_label2(
                 &context.style.label_style,
                 Vec2::new(pos.x + size.x / 2. + 5., pos.y),
                 self.label,

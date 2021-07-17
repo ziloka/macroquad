@@ -80,6 +80,30 @@ use input::{InputCharacter, Key};
 
 pub type Id = u64;
 
+pub enum UiContent<'a> {
+    Label(&'a str),
+    LabelOwned(String),
+    Texture(crate::texture::Texture2D),
+}
+
+impl<'a> From<&'a str> for UiContent<'a> {
+    fn from(data: &'a str) -> UiContent<'a> {
+        UiContent::Label(data)
+    }
+}
+
+impl From<String> for UiContent<'static> {
+    fn from(data: String) -> UiContent<'static> {
+        UiContent::LabelOwned(data)
+    }
+}
+
+impl From<crate::texture::Texture2D> for UiContent<'static> {
+    fn from(data: crate::texture::Texture2D) -> UiContent<'static> {
+        UiContent::Texture(data)
+    }
+}
+
 pub(crate) struct Window {
     pub id: Id,
     pub parent: Option<Id>,

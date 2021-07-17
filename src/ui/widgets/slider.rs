@@ -143,7 +143,7 @@ impl<'a> Slider<'a> {
             }),
         );
 
-        context.window.painter.draw_element_label(
+        context.window.painter.draw_element_label2(
             &context.style.label_style,
             vec2(
                 pos.x + editbox_width + slider_width + margin * 2.,

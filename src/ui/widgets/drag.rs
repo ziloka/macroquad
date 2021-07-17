@@ -1,6 +1,6 @@
 use crate::{
     math::{vec2, Rect, Vec2},
-    ui::{widgets::Editbox, ElementState, Id, Layout, Ui},
+    ui::{widgets::Editbox, ElementState, Id, Layout, Ui, UiContent},
 };
 
 use std::any::Any;
@@ -88,7 +88,7 @@ impl<'a> Drag<'a> {
         let label_size = context
             .window
             .painter
-            .element_size(&context.style.label_style, self.label);
+            .content_with_margins_size(&context.style.label_style, &UiContent::Label(self.label));
         let size = vec2(
             context.window.cursor.area.w - context.style.margin * 2. - context.window.cursor.ident,
             label_size.y.max(22.),
@@ -133,9 +133,9 @@ impl<'a> Drag<'a> {
             let value_size = context
                 .window
                 .painter
-                .element_size(&context.style.label_style, &label);
+                .content_with_margins_size(&context.style.label_style, &UiContent::Label(&label));
 
-            context.window.painter.draw_element_label(
+            context.window.painter.draw_element_label2(
                 &context.style.label_style,
                 pos + Vec2::new(size.x / 2. - value_size.x - 15., 0.),
                 &label,
@@ -209,7 +209,7 @@ impl<'a> Drag<'a> {
         let context = ui.get_active_window_context();
 
         if self.label.is_empty() == false {
-            context.window.painter.draw_element_label(
+            context.window.painter.draw_element_label2(
                 &context.style.label_style,
                 Vec2::new(pos.x + size.x / 2. + 5., pos.y),
                 self.label,

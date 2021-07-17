@@ -1,5 +1,5 @@
 use crate::{
-    math::Vec2,
+    math::{vec2, Vec2},
     ui::{ElementState, Id, Ui, WindowContext},
 };
 
@@ -139,6 +139,7 @@ impl Window {
                 context.window.painter.draw_element_label(
                     &context.style.window_titlebar_style,
                     position,
+                    vec2(size.x, style.title_height),
                     label,
                     ElementState {
                         focused,
@@ -149,8 +150,8 @@ impl Window {
                 );
             }
             context.window.painter.draw_line(
-                Vec2::new(position.x, position.y + style.title_height),
-                Vec2::new(position.x + size.x, position.y + style.title_height),
+                vec2(position.x, position.y + style.title_height),
+                vec2(position.x + size.x, position.y + style.title_height),
                 style.window_titlebar_style.color(ElementState {
                     focused,
                     clicked: false,

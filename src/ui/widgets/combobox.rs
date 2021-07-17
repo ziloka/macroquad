@@ -83,7 +83,7 @@ impl<'a, 'b, 'c> ComboBox<'a, 'b, 'c> {
             .painter
             .draw_rect(clickable_rect, color, None);
 
-        context.window.painter.draw_element_label(
+        context.window.painter.draw_element_label2(
             &context.style.label_style,
             Vec2::new(pos.x, pos.y),
             self.variants[*data],
