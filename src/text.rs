@@ -249,7 +249,7 @@ pub fn load_ttf_font_from_bytes(bytes: &[u8]) -> Result<Font, FontError> {
     let context = get_context();
     let atlas = Rc::new(RefCell::new(Atlas::new(
         &mut get_context().quad_context,
-        miniquad::FilterMode::Linear,
+        miniquad::FilterMode::Nearest,
     )));
 
     let font = context
@@ -356,7 +356,7 @@ pub(crate) struct FontsStorage {
 
 impl FontsStorage {
     pub(crate) fn new(ctx: &mut miniquad::Context) -> FontsStorage {
-        let atlas = Rc::new(RefCell::new(Atlas::new(ctx, miniquad::FilterMode::Linear)));
+        let atlas = Rc::new(RefCell::new(Atlas::new(ctx, miniquad::FilterMode::Nearest)));
 
         let default_font =
             FontInternal::load_from_bytes(atlas, include_bytes!("ProggyClean.ttf")).unwrap();
