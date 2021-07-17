@@ -135,6 +135,14 @@ impl<T: 'static> RefMut<T> {
             .permanent = true;
     }
 
+    pub fn provides<S: std::any::Any>(&mut self, x: S) {
+        let key = std::any::TypeId::of::<S>();
+
+        let scene = unsafe { get_scene() };
+        let array = scene.any_map.entry(key).or_insert_with(|| vec![]);
+        array.push(scene.arena.alloc(x) as *mut _ as *mut _);
+    }
+
     pub fn delete(self) {
         assert!(self.handle.id.is_some());
 
@@ -321,6 +329,7 @@ struct Scene {
     current_time: f64,
     in_fixed_update: bool,
 
+    any_map: std::collections::HashMap<std::any::TypeId, Vec<*mut u8>>,
     free_nodes: Vec<Cell>,
 }
 
@@ -337,10 +346,13 @@ impl Scene {
             acc: 0.0,
             current_time: crate::time::get_time(),
             in_fixed_update: false,
+            any_map: std::collections::HashMap::new(),
         }
     }
 
     pub fn clear(&mut self) {
+        self.any_map.clear();
+
         for cell in &mut self.nodes {
             if let Some(Cell {
                 permanent: false, ..
@@ -623,6 +635,19 @@ pub fn find_node_by_type<T: Any>() -> Option<RefMut<T>> {
         .iter()
         .find(|node| node.is::<T>())
         .map(|node| node.to_typed())
+}
+
+pub fn find_nodes_with<T: Any>() -> impl Iterator<Item = T> {
+    let scene = unsafe { get_scene() };
+
+    let key = std::any::TypeId::of::<T>();
+    let array = scene.any_map.entry(key).or_insert_with(|| vec![]).clone();
+
+    array.into_iter().map(|data| unsafe {
+        let mut res = std::mem::MaybeUninit::<T>::uninit();
+        std::ptr::copy_nonoverlapping::<T>(data as *mut T, res.as_mut_ptr(), 1);
+        res.assume_init()
+    })
 }
 
 pub fn find_nodes_by_type<T: Any>() -> impl Iterator<Item = RefMut<T>> {
