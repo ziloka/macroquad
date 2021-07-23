@@ -256,12 +256,19 @@ struct Cell {
     update: *const fn(RefMut<()>),
     fixed_update: *const fn(RefMut<()>),
     draw: *const fn(RefMut<()>),
+    virtual_drop: *const fn(*mut ()),
     data_len: usize,
     permanent: bool,
     initialized: bool,
     used: *mut bool,
 }
 unsafe impl Sync for Scene {}
+
+fn virtual_drop<T: Node + 'static>(data: *mut ()) {
+    unsafe {
+        std::ptr::drop_in_place(data as *mut T);
+    }
+}
 
 impl Cell {
     fn new<T: Node + 'static>(id: Id, data: *mut (), vtable: *mut (), used: *mut bool) -> Self {
@@ -282,6 +289,9 @@ impl Cell {
             },
             draw: unsafe {
                 std::mem::transmute(&(Node::draw as fn(RefMut<T>)) as *const fn(RefMut<T>))
+            },
+            virtual_drop: unsafe {
+                std::mem::transmute(&(virtual_drop::<T> as fn(*mut ())) as *const fn(*mut ()))
             },
             data_len: std::mem::size_of::<T>(),
             initialized: false,
@@ -305,6 +315,9 @@ impl Cell {
         };
         self.draw =
             unsafe { std::mem::transmute(&(Node::draw as fn(RefMut<T>)) as *const fn(RefMut<T>)) };
+        self.virtual_drop = unsafe {
+            std::mem::transmute(&(virtual_drop::<T> as fn(*mut ())) as *const fn(*mut ()))
+        };
 
         unsafe {
             std::ptr::copy_nonoverlapping::<T>(&data as *const _ as *mut _, self.data as *mut _, 1);
@@ -361,6 +374,9 @@ impl Scene {
                 if let Some(cell) = cell.take() {
                     assert!(unsafe { *cell.used == false });
 
+                    unsafe {
+                        (*cell.virtual_drop)(cell.data);
+                    }
                     let ix = self.dense.iter().position(|i| *i == cell.id).unwrap();
                     self.dense.remove(ix);
 
@@ -457,6 +473,9 @@ impl Scene {
 
             self.dense_ongoing.push(Err(id));
 
+            unsafe {
+                (*node.virtual_drop)(node.data);
+            }
             self.free_nodes.push(node);
         }
     }
@@ -476,7 +495,7 @@ impl Scene {
 
         let mut frame_time = new_time - self.current_time;
 
-        // https://medium.com/@tglaiel/how-to-make-your-game-run-at-60fps-24c61210fe75
+        // https://medium.com/@tglaiel/how-to-make-your-game-run-at-60fps-24c61210fe75x
         if (frame_time - 1.0 / 1200.0).abs() < 0.0002 {
             frame_time = 1.0 / 120.0;
         } else if (frame_time - 1.0 / 60.0).abs() < 0.0002 {
