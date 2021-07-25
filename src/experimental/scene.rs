@@ -140,7 +140,10 @@ impl<T: 'static> RefMut<T> {
 
         let scene = unsafe { get_scene() };
         let array = scene.any_map.entry(key).or_insert_with(|| vec![]);
-        array.push(scene.arena.alloc(x) as *mut _ as *mut _);
+        array.push((
+            self.handle().untyped(),
+            scene.arena.alloc(x) as *mut _ as *mut _,
+        ));
     }
 
     pub fn delete(self) {
@@ -342,7 +345,7 @@ struct Scene {
     current_time: f64,
     in_fixed_update: bool,
 
-    any_map: std::collections::HashMap<std::any::TypeId, Vec<*mut u8>>,
+    any_map: std::collections::HashMap<std::any::TypeId, Vec<(HandleUntyped, *mut u8)>>,
     free_nodes: Vec<Cell>,
 }
 
@@ -384,6 +387,26 @@ impl Scene {
                 }
             }
         }
+    }
+
+    fn is_deleted(&self, handle: HandleUntyped) -> bool {
+        let handle = handle.0;
+        let cell = self.nodes.get(handle.id);
+
+        if cell.is_none() {
+            return true;
+        }
+        let cell = cell.unwrap();
+        if cell.is_none() {
+            return true;
+        }
+        let cell = cell.as_ref().unwrap();
+
+        if cell.id.generation != handle.generation {
+            return true;
+        }
+
+        return false;
     }
 
     pub fn get_any(&self, handle: HandleUntyped) -> Option<RefMutAny> {
@@ -662,10 +685,14 @@ pub fn find_nodes_with<T: Any>() -> impl Iterator<Item = T> {
     let key = std::any::TypeId::of::<T>();
     let array = scene.any_map.entry(key).or_insert_with(|| vec![]).clone();
 
-    array.into_iter().map(|data| unsafe {
-        let mut res = std::mem::MaybeUninit::<T>::uninit();
-        std::ptr::copy_nonoverlapping::<T>(data as *mut T, res.as_mut_ptr(), 1);
-        res.assume_init()
+    array.into_iter().filter_map(|(id, data)| unsafe {
+        if get_scene().is_deleted(id) {
+            None
+        } else {
+            let mut res = std::mem::MaybeUninit::<T>::uninit();
+            std::ptr::copy_nonoverlapping::<T>(data as *mut T, res.as_mut_ptr(), 1);
+            Some(res.assume_init())
+        }
     })
 }
 
