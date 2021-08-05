@@ -25,3 +25,6 @@ pub use crate::logging::*;
 pub use crate::color_u8;
 
 pub use image::ImageFormat;
+
+pub use crate::scene_graph::load_model;
+pub use crate::scene_graph;

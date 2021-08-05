@@ -551,7 +551,7 @@ impl Scene {
         for camera in self.camera.iter() {
             if let Some(camera) = camera {
                 //self.camera_pos = camera.target;
-                crate::prelude::set_camera(&*camera);
+                //crate::prelude::set_camera(&*camera);
 
                 for node in &mut self.iter() {
                     let cell = self.nodes[node.handle.0.id].as_mut().unwrap();
@@ -559,7 +559,7 @@ impl Scene {
                     unsafe { (*cell.draw)(node) };
                 }
 
-                crate::prelude::set_default_camera();
+                //crate::prelude::set_default_camera();
             }
         }
 

@@ -1,4 +1,5 @@
 use crate::{
+    color::Color,
     file::{load_file, FileError},
     get_context,
     math::{vec3, Mat4, Rect},
@@ -47,8 +48,29 @@ pub async fn load_model(path: &str) -> Result<Model, FileError> {
     Ok(Model { bindings })
 }
 
+use crate::quad_gl::QuadGl;
+
+pub struct SpriteLayer {
+    gl: Option<QuadGl>,
+}
+
+impl SpriteLayer {
+    pub fn gl(&mut self) -> &mut QuadGl {
+        self.gl.as_mut().unwrap()
+    }
+}
+
+impl Drop for SpriteLayer {
+    fn drop(&mut self) {
+        if self.gl.is_some() {
+            println!("SpriteLayer::draw() not called, probably some graphics is lost");
+        }
+    }
+}
+
 pub struct SceneGraph {
     models: Vec<(Model, Mat4)>,
+    layers_cache: Vec<QuadGl>,
     pipeline: miniquad::Pipeline,
     camera: crate::camera::Camera,
 }
@@ -86,6 +108,7 @@ impl SceneGraph {
 
         SceneGraph {
             models: vec![],
+            layers_cache: vec![QuadGl::new(ctx), QuadGl::new(ctx), QuadGl::new(ctx)],
             camera,
             pipeline,
         }
@@ -96,48 +119,64 @@ impl SceneGraph {
         self.models.len() - 1
     }
 
-    pub fn draw(&mut self) {
+    pub fn sprite_layer(&mut self) -> SpriteLayer {
+        SpriteLayer {
+            gl: self.layers_cache.pop(),
+        }
+    }
+
+    pub fn clear(&mut self, color: Color) {
+        let ctx = &mut get_context().quad_context;
+        let clear = PassAction::clear_color(color.r, color.g, color.b, color.a);
+
+        ctx.begin_default_pass(clear);
+        ctx.end_render_pass();
+    }
+
+    pub fn draw_canvas(&mut self, mut canvas: SpriteLayer) {
+        let context = &mut get_context().quad_context;
+
+        let (width, height) = context.screen_size();
+
+        let screen_mat = glam::Mat4::orthographic_rh_gl(0., width, height, 0., -1., 1.);
+        canvas.gl().draw(context, screen_mat);
+
+        self.layers_cache.push(canvas.gl.take().unwrap());
+    }
+
+    pub fn draw_model(&mut self, model: &Model, transform: Mat4) {
         // unsafe {
         //     miniquad::gl::glPolygonMode(miniquad::gl::GL_FRONT_AND_BACK, miniquad::gl::GL_LINE);
         // }
         let ctx = &mut get_context().quad_context;
         let projection = self.camera.matrix();
 
-        let pass = get_context().gl.get_active_render_pass();
-        if let Some(pass) = pass {
-            ctx.begin_pass(pass, PassAction::Nothing);
-        } else {
-            ctx.begin_default_pass(PassAction::Nothing);
-        }
+        // let pass = get_context().gl.get_active_render_pass();
+        // if let Some(pass) = pass {
+        //     ctx.begin_pass(pass, PassAction::Nothing);
+        // } else {
+        ctx.begin_default_pass(PassAction::Nothing);
+        //}
 
         ctx.apply_pipeline(&self.pipeline);
 
-        for (model, transform) in &self.models {
-            ctx.apply_bindings(&model.bindings);
-            ctx.apply_uniforms(&shader::Uniforms {
-                projection,
-                model: *transform,
-            });
-            ctx.draw(0, model.bindings.index_buffer.size() as i32 / 2, 1);
-        }
+        ctx.apply_bindings(&model.bindings);
+        ctx.apply_uniforms(&shader::Uniforms {
+            projection,
+            model: transform,
+        });
+        ctx.draw(0, model.bindings.index_buffer.size() as i32 / 2, 1);
+
         ctx.end_render_pass();
 
         // unsafe {
         //     miniquad::gl::glPolygonMode(miniquad::gl::GL_FRONT_AND_BACK, miniquad::gl::GL_FILL);
         // }
     }
-}
 
-pub fn add_model(model: Model) -> usize {
-    get_context().scene_graph.add_model(model)
-}
-
-pub fn set_transform(model: usize, transform: Mat4) {
-    get_context().scene_graph.models[model].1 = transform;
-}
-
-pub fn draw() {
-    get_context().scene_graph.draw();
+    pub fn set_transform(&mut self, model: usize, transform: Mat4) {
+        self.models[model].1 = transform;
+    }
 }
 
 mod shader {

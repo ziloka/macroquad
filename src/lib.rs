@@ -165,6 +165,8 @@ struct Context {
     mouse_position: Vec2,
     mouse_wheel: Vec2,
 
+    scene_graph: scene_graph::SceneGraph,
+
     prevent_quit_event: bool,
     quit_requested: bool,
 
@@ -172,8 +174,6 @@ struct Context {
 
     input_events: Vec<Vec<MiniquadInputEvent>>,
 
-    gl: QuadGl,
-    scene_graph: scene_graph::SceneGraph,
     camera_matrix: Option<Mat4>,
 
     ui_context: UiContext,
@@ -189,7 +189,6 @@ struct Context {
     #[cfg(one_screenshot)]
     counter: usize,
 
-    camera_stack: Vec<camera::CameraState>,
     texture_batcher: texture::Batcher,
     unwind: bool,
     recovery_future: Option<Pin<Box<dyn Future<Output = ()>>>>,
@@ -292,14 +291,12 @@ impl Context {
             input_events: Vec::new(),
 
             camera_matrix: None,
-            gl: QuadGl::new(&mut ctx),
-            scene_graph: scene_graph::SceneGraph::new(&mut ctx),
 
             ui_context: UiContext::new(&mut ctx),
             fonts_storage: text::FontsStorage::new(&mut ctx),
             texture_batcher: texture::Batcher::new(&mut ctx),
-            camera_stack: vec![],
 
+            scene_graph: scene_graph::SceneGraph::new(&mut ctx),
             quad_context: ctx,
             audio_context: audio::AudioContext::new(),
             coroutines_context: experimental::coroutines::CoroutinesContext::new(),
@@ -321,17 +318,17 @@ impl Context {
         telemetry::begin_gpu_query("GPU");
 
         self.ui_context.process_input();
-        self.clear(Self::DEFAULT_BG_COLOR);
+        //self.clear(Self::DEFAULT_BG_COLOR);
     }
 
     fn end_frame(&mut self) {
         crate::experimental::scene::update();
 
-        self.perform_render_passes();
+        //self.perform_render_passes();
 
-        self.ui_context.draw(&mut self.quad_context, &mut self.gl);
-        let screen_mat = self.pixel_perfect_projection_matrix();
-        self.gl.draw(&mut self.quad_context, screen_mat);
+        //self.ui_context.draw(&mut self.quad_context, &mut self.gl);
+        //let screen_mat = self.pixel_perfect_projection_matrix();
+        //self.gl.draw(&mut self.quad_context, screen_mat);
 
         self.quad_context.commit_frame();
 
@@ -368,11 +365,11 @@ impl Context {
         }
     }
 
-    fn clear(&mut self, color: Color) {
-        self.quad_context
-            .clear(Some((color.r, color.g, color.b, color.a)), None, None);
-        self.gl.reset();
-    }
+    // fn clear(&mut self, color: Color) {
+    //     self.quad_context
+    //         .clear(Some((color.r, color.g, color.b, color.a)), None, None);
+    //     self.gl.reset();
+    // }
 
     pub(crate) fn pixel_perfect_projection_matrix(&self) -> glam::Mat4 {
         let (width, height) = self.quad_context.screen_size();
@@ -388,11 +385,11 @@ impl Context {
         }
     }
 
-    pub(crate) fn perform_render_passes(&mut self) {
-        let matrix = self.projection_matrix();
+    // pub(crate) fn perform_render_passes(&mut self) {
+    //     let matrix = self.projection_matrix();
 
-        self.gl.draw(&mut self.quad_context, matrix);
-    }
+    //     self.gl.draw(&mut self.quad_context, matrix);
+    // }
 }
 
 #[no_mangle]
@@ -655,6 +652,10 @@ impl EventHandlerFree for Stage {
             context.quit_requested = true;
         }
     }
+}
+
+pub fn scene_graph() -> &'static mut scene_graph::SceneGraph {
+    &mut get_context().scene_graph
 }
 
 /// Not meant to be used directly, only from the macro.

@@ -17,6 +17,8 @@ use std::rc::Rc;
 
 pub(crate) mod atlas;
 
+use crate::scene_graph::SpriteLayer;
+
 use atlas::Atlas;
 
 #[derive(Debug)]
@@ -262,8 +264,16 @@ pub fn load_ttf_font_from_bytes(bytes: &[u8]) -> Result<Font, FontError> {
 }
 
 /// Draw text with given font_size
-pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
+pub fn draw_text(
+    sprite_layer: &mut SpriteLayer,
+    text: &str,
+    x: f32,
+    y: f32,
+    font_size: f32,
+    color: Color,
+) {
     draw_text_ex(
+        sprite_layer,
         text,
         x,
         y,
@@ -277,7 +287,13 @@ pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
 }
 
 /// Draw text with custom params such as font, font size and font scale.
-pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
+pub fn draw_text_ex(
+    sprite_layer: &mut SpriteLayer,
+    text: &str,
+    x: f32,
+    y: f32,
+    params: TextParams,
+) {
     let font = get_context().fonts_storage.get_font_mut(params.font);
 
     let font_scale_x = params.font_scale * params.font_scale_aspect;
@@ -312,6 +328,7 @@ pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
         );
 
         crate::texture::draw_texture_ex(
+            sprite_layer,
             atlas.texture(),
             dest.x,
             dest.y,

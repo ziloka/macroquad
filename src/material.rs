@@ -16,17 +16,17 @@ impl Material {
     /// "name" should be from "uniforms" list used for material creation.
     /// Otherwise uniform value would be silently ignored.
     pub fn set_uniform<T>(&self, name: &str, uniform: T) {
-        get_context().gl.set_uniform(self.pipeline, name, uniform);
+        //get_context().gl.set_uniform(self.pipeline, name, uniform);
     }
 
     pub fn set_texture(&self, name: &str, texture: Texture2D) {
-        get_context().gl.set_texture(self.pipeline, name, texture);
+        //get_context().gl.set_texture(self.pipeline, name, texture);
     }
 
     /// Delete this material. Using deleted material for either rendering
     /// or uniforms manipulation will result internal GL errors.
     pub fn delete(&mut self) {
-        get_context().gl.delete_pipeline(self.pipeline);
+        //get_context().gl.delete_pipeline(self.pipeline);
     }
 }
 
@@ -62,26 +62,29 @@ pub fn load_material(
 ) -> Result<Material, ShaderError> {
     let context = &mut get_context();
 
-    let pipeline = context.gl.make_pipeline(
-        &mut context.quad_context,
-        vertex_shader,
-        fragment_shader,
-        params.pipeline_params,
-        params.uniforms,
-        params.textures,
-    )?;
+    // let pipeline = context.gl.make_pipeline(
+    //     &mut context.quad_context,
+    //     vertex_shader,
+    //     fragment_shader,
+    //     params.pipeline_params,
+    //     params.uniforms,
+    //     params.textures,
+    // )?;
 
-    Ok(Material { pipeline })
+    // Ok(Material { pipeline })
+    unimplemented!()
 }
 
 /// All following macroquad rendering calls will use the given material.
 pub fn gl_use_material(material: Material) {
-    get_context().gl.pipeline(Some(material.pipeline));
+    //get_context().gl.pipeline(Some(material.pipeline));
+    unimplemented!()
 }
 
 /// Use default macroquad material.
 pub fn gl_use_default_material() {
-    get_context().gl.pipeline(None);
+    //get_context().gl.pipeline(None);
+    unimplemented!()
 }
 
 #[doc(hidden)]

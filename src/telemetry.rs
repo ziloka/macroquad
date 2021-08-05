@@ -96,16 +96,18 @@ pub fn end_gpu_query() {
 /// Workaround to stop gl capture on debug rendering
 #[doc(hidden)]
 pub fn pause_gl_capture() {
-    if get_profiler().capture {
-        crate::get_context().gl.capture(false);
-    }
+    // if get_profiler().capture {
+    //     crate::get_context().gl.capture(false);
+    // }
+    unimplemented!()
 }
 
 /// Workaround to stop gl capture on debug rendering
 pub fn resume_gl_capture() {
-    if get_profiler().capture {
-        crate::get_context().gl.capture(false);
-    }
+    // if get_profiler().capture {
+    //     crate::get_context().gl.capture(false);
+    // }
+    unimplemented!()
 }
 
 pub(crate) fn reset() {
@@ -127,13 +129,13 @@ pub(crate) fn reset() {
 
     if profiler.capture {
         profiler.capture = false;
-        crate::get_context().gl.capture(false);
+        //crate::get_context().gl.capture(false);
     }
 
     if profiler.capture_request {
         profiler.drawcalls.clear();
         profiler.capture = true;
-        crate::get_context().gl.capture(true);
+        //crate::get_context().gl.capture(true);
         profiler.capture_request = false;
     }
 }
