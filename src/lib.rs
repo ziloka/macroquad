@@ -36,6 +36,8 @@
 //! }
 //!```
 
+#![allow(warnings)]
+
 use miniquad::Context as QuadContext;
 use miniquad::*;
 
@@ -66,6 +68,8 @@ pub mod experimental;
 pub mod prelude;
 
 pub mod telemetry;
+
+pub mod scene_graph;
 
 /// Macroquad entry point.
 ///
@@ -169,6 +173,7 @@ struct Context {
     input_events: Vec<Vec<MiniquadInputEvent>>,
 
     gl: QuadGl,
+    scene_graph: scene_graph::SceneGraph,
     camera_matrix: Option<Mat4>,
 
     ui_context: UiContext,
@@ -288,6 +293,7 @@ impl Context {
 
             camera_matrix: None,
             gl: QuadGl::new(&mut ctx),
+            scene_graph: scene_graph::SceneGraph::new(&mut ctx),
 
             ui_context: UiContext::new(&mut ctx),
             fonts_storage: text::FontsStorage::new(&mut ctx),

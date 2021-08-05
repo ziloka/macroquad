@@ -242,8 +242,17 @@ pub fn render_target(width: u32, height: u32) -> RenderTarget {
             ..Default::default()
         },
     );
+    let depth_img = miniquad::Texture::new_render_texture(
+        context,
+        miniquad::TextureParams {
+            width,
+            height,
+            format: miniquad::TextureFormat::Depth,
+            ..Default::default()
+        },
+    );
 
-    let render_pass = miniquad::RenderPass::new(context, texture, None);
+    let render_pass = miniquad::RenderPass::new(context, texture, depth_img);
 
     let texture = Texture2D::from_miniquad_texture(texture);
 

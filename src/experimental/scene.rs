@@ -1,6 +1,6 @@
 use std::{any::Any, marker::PhantomData, ops::Drop};
 
-use crate::camera::Camera2D;
+use crate::camera::Camera;
 
 #[rustfmt::skip]
 pub trait Node {
@@ -338,7 +338,7 @@ struct Scene {
     dense_ongoing: Vec<Result<Id, Id>>,
     nodes: Vec<Option<Cell>>,
     arena: bumpalo::Bump,
-    camera: [Option<Camera2D>; 2],
+    camera: [Option<Camera>; 2],
     camera_pos: crate::Vec2,
 
     acc: f64,
@@ -357,7 +357,7 @@ impl Scene {
             nodes: Vec::new(),
             arena: bumpalo::Bump::new(),
             free_nodes: Vec::new(),
-            camera: [Some(Camera2D::default()), None],
+            camera: [Some(Camera::default()), None],
             camera_pos: crate::vec2(0., 0.),
             acc: 0.0,
             current_time: crate::time::get_time(),
@@ -550,7 +550,7 @@ impl Scene {
 
         for camera in self.camera.iter() {
             if let Some(camera) = camera {
-                self.camera_pos = camera.target;
+                //self.camera_pos = camera.target;
                 crate::prelude::set_camera(&*camera);
 
                 for node in &mut self.iter() {
@@ -652,11 +652,11 @@ pub fn camera_pos() -> crate::Vec2 {
     unsafe { get_scene() }.camera_pos
 }
 
-pub fn set_camera_1(camera: Camera2D) {
+pub fn set_camera_1(camera: Camera) {
     unsafe { get_scene() }.camera[0] = Some(camera);
 }
 
-pub fn set_camera_2(camera: Camera2D) {
+pub fn set_camera_2(camera: Camera) {
     unsafe { get_scene() }.camera[1] = Some(camera);
 }
 

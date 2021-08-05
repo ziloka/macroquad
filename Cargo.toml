@@ -28,7 +28,7 @@ all-features = true
 [dependencies]
 miniquad = { version = "0.3.0-alpha.37", features = ["log-impl"] }
 quad-rand = "0.2.1"
-glam = {version = "0.14", features = ["scalar-math"] }
+glam = {version = "0.17", features = ["scalar-math"] }
 image = { version = "0.23.12", default-features = false, features = ["png", "tga"] }
 macroquad_macro = { version = "0.1.5", path = "macroquad_macro" }
 fontdue = "0.5.0"
@@ -36,12 +36,13 @@ bumpalo = "3.4"
 backtrace = { version = "0.3.60", optional = true, default-features = false, features = [ "std", "libbacktrace" ] }
 log = { version = "0.4", optional = true }
 quad-snd = { version = "0.2", optional = true }
+gltf = "*"
 
 [dev-dependencies]
-macroquad-particles = { path = "./particles" }
-macroquad-tiled = { path = "./tiled" }
-macroquad-profiler = { path = "./profiler" }
-macroquad-platformer = { path = "./physics-platformer" }
+#macroquad-particles = { path = "./particles" }
+#macroquad-tiled = { path = "./tiled" }
+#macroquad-profiler = { path = "./profiler" }
+#macroquad-platformer = { path = "./physics-platformer" }
 
 # workaround to fix the examples
 # this allows to use macroquad-particles in examples without two versions of macroquad

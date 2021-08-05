@@ -258,8 +258,8 @@ impl MagicSnapshotter {
                 || self
                     .screen_texture
                     .map(|t| {
-                        t.texture.width != screen_width as _
-                            || t.texture.height != screen_height as _
+                        t.texture.width != screen_width as u32
+                            || t.texture.height != screen_height as u32
                     })
                     .unwrap_or(false)
             {
