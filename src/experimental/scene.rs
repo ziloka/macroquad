@@ -1,6 +1,6 @@
 use std::{any::Any, marker::PhantomData, ops::Drop};
 
-use crate::camera::Camera;
+use crate::camera::RenderState;
 
 #[rustfmt::skip]
 pub trait Node {
@@ -338,7 +338,7 @@ struct Scene {
     dense_ongoing: Vec<Result<Id, Id>>,
     nodes: Vec<Option<Cell>>,
     arena: bumpalo::Bump,
-    camera: [Option<Camera>; 2],
+    camera: [Option<RenderState>; 2],
     camera_pos: crate::Vec2,
 
     acc: f64,
@@ -357,7 +357,7 @@ impl Scene {
             nodes: Vec::new(),
             arena: bumpalo::Bump::new(),
             free_nodes: Vec::new(),
-            camera: [Some(Camera::default()), None],
+            camera: [Some(RenderState::default()), None],
             camera_pos: crate::vec2(0., 0.),
             acc: 0.0,
             current_time: crate::time::get_time(),
@@ -652,13 +652,13 @@ pub fn camera_pos() -> crate::Vec2 {
     unsafe { get_scene() }.camera_pos
 }
 
-pub fn set_camera_1(camera: Camera) {
-    unsafe { get_scene() }.camera[0] = Some(camera);
-}
+// pub fn set_camera_1(camera: Camera) {
+//     unsafe { get_scene() }.camera[0] = Some(camera);
+// }
 
-pub fn set_camera_2(camera: Camera) {
-    unsafe { get_scene() }.camera[1] = Some(camera);
-}
+// pub fn set_camera_2(camera: Camera) {
+//     unsafe { get_scene() }.camera[1] = Some(camera);
+// }
 
 pub fn add_node<T: Node>(node: T) -> Handle<T> {
     unsafe { get_scene() }.add_node(node)

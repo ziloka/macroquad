@@ -1,4 +1,5 @@
 use crate::{
+    camera::RenderState,
     color::Color,
     file::{load_file, FileError},
     get_context,
@@ -51,20 +52,17 @@ pub async fn load_model(path: &str) -> Result<Model, FileError> {
 use crate::quad_gl::QuadGl;
 
 pub struct SpriteLayer {
-    gl: Option<QuadGl>,
+    gl: QuadGl,
+    render_state: RenderState,
 }
 
 impl SpriteLayer {
-    pub fn gl(&mut self) -> &mut QuadGl {
-        self.gl.as_mut().unwrap()
+    pub fn new(mut gl: QuadGl, render_state: RenderState) -> SpriteLayer {
+        SpriteLayer { gl, render_state }
     }
-}
 
-impl Drop for SpriteLayer {
-    fn drop(&mut self) {
-        if self.gl.is_some() {
-            println!("SpriteLayer::draw() not called, probably some graphics is lost");
-        }
+    pub fn gl(&mut self) -> &mut QuadGl {
+        &mut self.gl
     }
 }
 
@@ -72,7 +70,6 @@ pub struct SceneGraph {
     models: Vec<(Model, Mat4)>,
     layers_cache: Vec<QuadGl>,
     pipeline: miniquad::Pipeline,
-    camera: crate::camera::Camera,
 }
 
 impl SceneGraph {
@@ -95,21 +92,9 @@ impl SceneGraph {
             },
         );
 
-        let camera = crate::camera::Camera {
-            location: crate::camera::CameraLocation::Camera3D {
-                position: vec3(-10., 7.5, 0.),
-                up: vec3(0., 1., 0.),
-                target: vec3(0., 0., 0.),
-                fovy: 45.,
-                projection: crate::camera::Projection::Perspective,
-            },
-            ..Default::default()
-        };
-
         SceneGraph {
             models: vec![],
             layers_cache: vec![QuadGl::new(ctx), QuadGl::new(ctx), QuadGl::new(ctx)],
-            camera,
             pipeline,
         }
     }
@@ -119,10 +104,8 @@ impl SceneGraph {
         self.models.len() - 1
     }
 
-    pub fn sprite_layer(&mut self) -> SpriteLayer {
-        SpriteLayer {
-            gl: self.layers_cache.pop(),
-        }
+    pub fn sprite_layer(&mut self, render_state: RenderState) -> SpriteLayer {
+        SpriteLayer::new(self.layers_cache.pop().unwrap(), render_state)
     }
 
     pub fn clear(&mut self, color: Color) {
@@ -130,6 +113,18 @@ impl SceneGraph {
         let clear = PassAction::clear_color(color.r, color.g, color.b, color.a);
 
         ctx.begin_default_pass(clear);
+        ctx.end_render_pass();
+    }
+
+    pub fn clear2(&mut self, render_state: &RenderState, color: Color) {
+        let ctx = &mut get_context().quad_context;
+        let clear = PassAction::clear_color(color.r, color.g, color.b, color.a);
+
+        if let Some(pass) = render_state.render_target.map(|rt| rt.render_pass) {
+            ctx.begin_pass(pass, clear);
+        } else {
+            ctx.begin_default_pass(clear);
+        }
         ctx.end_render_pass();
     }
 
@@ -141,28 +136,28 @@ impl SceneGraph {
         let screen_mat = glam::Mat4::orthographic_rh_gl(0., width, height, 0., -1., 1.);
         canvas.gl().draw(context, screen_mat);
 
-        self.layers_cache.push(canvas.gl.take().unwrap());
+        self.layers_cache.push(canvas.gl);
     }
 
-    pub fn draw_model(&mut self, model: &Model, transform: Mat4) {
+    pub fn draw_model(&mut self, render_state: &RenderState, model: &Model, transform: Mat4) {
         // unsafe {
         //     miniquad::gl::glPolygonMode(miniquad::gl::GL_FRONT_AND_BACK, miniquad::gl::GL_LINE);
         // }
         let ctx = &mut get_context().quad_context;
-        let projection = self.camera.matrix();
+        //let projection = self.camera.matrix();
 
         // let pass = get_context().gl.get_active_render_pass();
-        // if let Some(pass) = pass {
-        //     ctx.begin_pass(pass, PassAction::Nothing);
-        // } else {
-        ctx.begin_default_pass(PassAction::Nothing);
-        //}
+        if let Some(pass) = render_state.render_target.map(|rt| rt.render_pass) {
+            ctx.begin_pass(pass, PassAction::Nothing);
+        } else {
+            ctx.begin_default_pass(PassAction::Nothing);
+        }
 
         ctx.apply_pipeline(&self.pipeline);
 
         ctx.apply_bindings(&model.bindings);
         ctx.apply_uniforms(&shader::Uniforms {
-            projection,
+            projection: render_state.matrix(),
             model: transform,
         });
         ctx.draw(0, model.bindings.index_buffer.size() as i32 / 2, 1);

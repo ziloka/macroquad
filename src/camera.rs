@@ -14,7 +14,7 @@ pub enum Projection {
 }
 
 #[derive(Debug, Clone)]
-pub enum CameraLocation {
+pub enum Camera {
     Camera2D {
         /// Rotation in degrees
         rotation: f32,
@@ -41,27 +41,27 @@ pub enum CameraLocation {
 }
 
 #[derive(Clone, Debug)]
-pub struct Camera {
+pub struct RenderState {
     pub depth_enabled: bool,
     pub render_target: Option<RenderTarget>,
 
     pub aspect: Option<f32>,
 
     ///
-    pub location: CameraLocation,
+    pub camera: Camera,
     /// Rectangle on the screen where this camera's output is drawn
     /// Numbers are pixels in window-spae, x, y, width, height
     pub viewport: Option<(i32, i32, i32, i32)>,
 }
 
-impl Default for Camera {
+impl Default for RenderState {
     fn default() -> Self {
-        Camera {
+        RenderState {
             depth_enabled: false,
             render_target: None,
             aspect: None,
 
-            location: CameraLocation::Camera2D {
+            camera: Camera::Camera2D {
                 target: vec2(0., 0.),
                 zoom: vec2(1., 1.),
                 offset: vec2(0., 0.),
@@ -72,13 +72,13 @@ impl Default for Camera {
     }
 }
 
-impl Camera {
+impl RenderState {
     const Z_NEAR: f32 = 1.1;
     const Z_FAR: f32 = 100.0;
 
     pub fn matrix(&self) -> Mat4 {
-        match self.location {
-            CameraLocation::Camera2D {
+        match self.camera {
+            Camera::Camera2D {
                 target,
                 rotation,
                 zoom,
@@ -108,7 +108,7 @@ impl Camera {
 
                 mat_translation * ((mat_scale * mat_rotation) * mat_origin)
             }
-            CameraLocation::Camera3D {
+            Camera::Camera3D {
                 fovy,
                 position,
                 target,
@@ -166,5 +166,3 @@ impl Camera {
 //     context.gl.depth_test(false);
 //     context.camera_matrix = None;
 // }
-
-
