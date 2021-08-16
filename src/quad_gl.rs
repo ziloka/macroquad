@@ -4,7 +4,7 @@ use miniquad::*;
 
 pub use miniquad::{FilterMode, ShaderError};
 
-use crate::{color::Color, logging::warn, telemetry, texture::Texture2D};
+use crate::{color::Color, logging::warn, material::Material, telemetry, texture::Texture2D};
 
 use std::collections::BTreeMap;
 
@@ -15,7 +15,7 @@ pub enum DrawMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GlPipeline(usize);
+struct GlPipeline(usize);
 
 struct DrawCall {
     vertices: Vec<Vertex>,
@@ -303,69 +303,8 @@ impl GlState {
     }
 }
 
-#[derive(Clone)]
-struct Uniform {
-    name: String,
-    uniform_type: UniformType,
-    byte_offset: usize,
-}
-
-#[derive(Clone)]
-struct PipelineExt {
-    pipeline: miniquad::Pipeline,
-    wants_screen_texture: bool,
-    uniforms: Vec<Uniform>,
-    uniforms_data: Vec<u8>,
-    textures: Vec<String>,
-    textures_data: BTreeMap<String, Texture>,
-}
-
-impl PipelineExt {
-    fn set_uniform<T>(&mut self, name: &str, uniform: T) {
-        let uniform_meta = self.uniforms.iter().find(
-            |Uniform {
-                 name: uniform_name, ..
-             }| uniform_name == name,
-        );
-        if uniform_meta.is_none() {
-            warn!("Trying to set non-existing uniform: {}", name);
-            return;
-        }
-        let uniform_meta = uniform_meta.unwrap();
-        let uniform_format = uniform_meta.uniform_type;
-        let uniform_byte_size = uniform_format.size();
-        let uniform_byte_offset = uniform_meta.byte_offset;
-
-        if std::mem::size_of::<T>() != uniform_byte_size {
-            warn!(
-                "Trying to set uniform {} sized {} bytes value of {} bytes",
-                name,
-                std::mem::size_of::<T>(),
-                uniform_byte_size
-            );
-            return;
-        }
-        macro_rules! transmute_uniform {
-            ($uniform_size:expr, $byte_offset:expr, $n:expr) => {
-                if $uniform_size == $n {
-                    let data: [u8; $n] = unsafe { std::mem::transmute_copy(&uniform) };
-
-                    for i in 0..$uniform_size {
-                        self.uniforms_data[$byte_offset + i] = data[i];
-                    }
-                }
-            };
-        }
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 4);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 8);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 12);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 16);
-        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 64);
-    }
-}
-
 struct PipelinesStorage {
-    pipelines: [Option<PipelineExt>; Self::MAX_PIPELINES],
+    pipelines: [Option<Material>; Self::MAX_PIPELINES],
     pipelines_amount: usize,
 }
 
@@ -462,54 +401,13 @@ impl PipelinesStorage {
         mut uniforms: Vec<(String, UniformType)>,
         textures: Vec<String>,
     ) -> GlPipeline {
-        let pipeline = Pipeline::with_params(
-            ctx,
-            &[BufferLayout::default()],
-            &[
-                VertexAttribute::new("position", VertexFormat::Float3),
-                VertexAttribute::new("texcoord", VertexFormat::Float2),
-                VertexAttribute::new("color0", VertexFormat::Byte4),
-            ],
-            shader,
-            params,
-        );
-
         let id = self
             .pipelines
             .iter()
             .position(|p| p.is_none())
             .unwrap_or_else(|| panic!("Pipelines amount exceeded"));
 
-        let mut max_offset = 0;
-
-        for (name, kind) in shader::uniforms().into_iter().rev() {
-            uniforms.insert(0, (name.to_owned(), kind));
-        }
-
-        let uniforms = uniforms
-            .iter()
-            .scan(0, |offset, uniform| {
-                let uniform_byte_size = uniform.1.size();
-                let uniform = Uniform {
-                    name: uniform.0.clone(),
-                    uniform_type: uniform.1,
-                    byte_offset: *offset,
-                };
-                *offset += uniform_byte_size;
-                max_offset = *offset;
-
-                Some(uniform)
-            })
-            .collect();
-
-        self.pipelines[id] = Some(PipelineExt {
-            pipeline,
-            wants_screen_texture,
-            uniforms,
-            uniforms_data: vec![0; max_offset],
-            textures,
-            textures_data: BTreeMap::new(),
-        });
+        self.pipelines[id] = Some(Material::new2(ctx, shader, params, uniforms, textures).unwrap());
         self.pipelines_amount += 1;
 
         GlPipeline(id)
@@ -524,7 +422,7 @@ impl PipelinesStorage {
         }
     }
 
-    fn get_quad_pipeline_mut(&mut self, pip: GlPipeline) -> &mut PipelineExt {
+    fn get_quad_pipeline_mut(&mut self, pip: GlPipeline) -> &mut Material {
         self.pipelines[pip.0].as_mut().unwrap()
     }
 
@@ -577,7 +475,7 @@ impl QuadGl {
         }
     }
 
-    pub fn make_pipeline(
+    fn make_pipeline(
         &mut self,
         ctx: &mut Context,
         vertex_shader: &str,
@@ -717,7 +615,7 @@ impl QuadGl {
                 }
             }
 
-            ctx.apply_pipeline(&pipeline.pipeline);
+            ctx.apply_pipeline(&pipeline.pipeline_2d);
             if let Some((x, y, w, h)) = dc.viewport {
                 ctx.apply_viewport(x, y, w, h);
             } else {
@@ -746,7 +644,7 @@ impl QuadGl {
             ctx.end_render_pass();
 
             if dc.capture {
-                telemetry::track_drawcall(&pipeline.pipeline, bindings, dc.indices_count);
+                telemetry::track_drawcall(&pipeline.pipeline_2d, bindings, dc.indices_count);
             }
 
             dc.vertices_count = 0;
@@ -815,10 +713,10 @@ impl QuadGl {
         }
     }
 
-    pub fn pipeline(&mut self, pipeline: Option<GlPipeline>) {
-        self.state.break_batching = true;
-        self.state.pipeline = pipeline;
-    }
+    // pub fn pipeline(&mut self, pipeline: Option<GlPipeline>) {
+    //     self.state.break_batching = true;
+    //     self.state.pipeline = pipeline;
+    // }
 
     pub fn draw_mode(&mut self, mode: DrawMode) {
         self.state.draw_mode = mode;
@@ -906,35 +804,22 @@ impl QuadGl {
         dc.texture = self.state.texture;
     }
 
-    pub fn delete_pipeline(&mut self, pipeline: GlPipeline) {
-        self.pipelines.delete_pipeline(pipeline);
-    }
+    // pub fn delete_pipeline(&mut self, pipeline: GlPipeline) {
+    //     self.pipelines.delete_pipeline(pipeline);
+    // }
 
-    pub fn set_uniform<T>(&mut self, pipeline: GlPipeline, name: &str, uniform: T) {
-        self.state.break_batching = true;
+    // pub fn set_uniform<T>(&mut self, pipeline: GlPipeline, name: &str, uniform: T) {
+    //     self.state.break_batching = true;
 
-        self.pipelines
-            .get_quad_pipeline_mut(pipeline)
-            .set_uniform(name, uniform);
-    }
+    //     self.pipelines
+    //         .get_quad_pipeline_mut(pipeline)
+    //         .set_uniform(name, uniform);
+    // }
 
-    pub fn set_texture(&mut self, pipeline: GlPipeline, name: &str, texture: Texture2D) {
-        let pipeline = self.pipelines.get_quad_pipeline_mut(pipeline);
-        pipeline
-            .textures
-            .iter()
-            .find(|x| *x == name)
-            .unwrap_or_else(|| {
-                panic!(
-                    "can't find texture with name '{}', there is only this names: {:?}",
-                    name, pipeline.textures
-                )
-            });
-        *pipeline
-            .textures_data
-            .entry(name.to_owned())
-            .or_insert(texture.texture) = texture.texture;
-    }
+    // pub fn set_texture(&mut self, pipeline: GlPipeline, name: &str, texture: Texture2D) {
+    //     let pipeline = self.pipelines.get_quad_pipeline_mut(pipeline);
+    //     pipeline.set_texture(name, texture);
+    // }
 
     pub(crate) fn update_drawcall_capacity(
         &mut self,

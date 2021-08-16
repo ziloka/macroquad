@@ -2,6 +2,7 @@
 
 use crate::{
     get_context,
+    material::Material,
     texture::RenderTarget,
     window::{screen_height, screen_width},
 };
@@ -52,6 +53,8 @@ pub struct RenderState {
     /// Rectangle on the screen where this camera's output is drawn
     /// Numbers are pixels in window-spae, x, y, width, height
     pub viewport: Option<(i32, i32, i32, i32)>,
+
+    pub material: Option<Material>,
 }
 
 impl Default for RenderState {
@@ -68,13 +71,14 @@ impl Default for RenderState {
                 rotation: 0.,
             },
             viewport: None,
+            material: None,
         }
     }
 }
 
 impl RenderState {
-    const Z_NEAR: f32 = 1.1;
-    const Z_FAR: f32 = 100.0;
+    const Z_NEAR: f32 = 3.0;
+    const Z_FAR: f32 = 1000.0;
 
     pub fn matrix(&self) -> Mat4 {
         match self.camera {

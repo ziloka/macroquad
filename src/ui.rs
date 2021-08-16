@@ -1191,64 +1191,64 @@ pub(crate) mod ui_context {
         }
 
         pub(crate) fn process_input(&mut self) {
-            use megaui::InputHandler;
+            // use megaui::InputHandler;
 
-            let mouse_position = mouse_position();
+            // let mouse_position = mouse_position();
 
-            let mut ui = self.ui.borrow_mut();
-            ui.mouse_move(mouse_position);
+            // let mut ui = self.ui.borrow_mut();
+            // ui.mouse_move(mouse_position);
 
-            if is_mouse_button_pressed(MouseButton::Left) {
-                ui.mouse_down(mouse_position);
-            }
-            if is_mouse_button_released(MouseButton::Left) {
-                ui.mouse_up(mouse_position);
-            }
+            // if is_mouse_button_pressed(MouseButton::Left) {
+            //     ui.mouse_down(mouse_position);
+            // }
+            // if is_mouse_button_released(MouseButton::Left) {
+            //     ui.mouse_up(mouse_position);
+            // }
 
-            let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
-            let ctrl = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
+            // let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
+            // let ctrl = is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl);
 
-            while let Some(c) = get_char_pressed() {
-                if ctrl == false {
-                    ui.char_event(c, false, false);
-                }
-            }
+            // while let Some(c) = get_char_pressed() {
+            //     if ctrl == false {
+            //         ui.char_event(c, false, false);
+            //     }
+            // }
 
-            macro_rules! process {
-                ($code:tt) => {
-                    if is_key_pressed(KeyCode::$code) || is_key_down(KeyCode::$code) {
-                        ui.key_down(megaui::KeyCode::$code, shift, ctrl);
-                    }
-                };
-            }
+            // macro_rules! process {
+            //     ($code:tt) => {
+            //         if is_key_pressed(KeyCode::$code) || is_key_down(KeyCode::$code) {
+            //             ui.key_down(megaui::KeyCode::$code, shift, ctrl);
+            //         }
+            //     };
+            // }
 
-            process!(Up);
-            process!(Down);
-            process!(Right);
-            process!(Left);
-            process!(Home);
-            process!(End);
-            process!(Delete);
-            process!(Backspace);
-            process!(Tab);
-            process!(Z);
-            process!(Y);
-            process!(C);
-            process!(X);
-            process!(V);
-            process!(A);
-            process!(Escape);
-            process!(Enter);
+            // process!(Up);
+            // process!(Down);
+            // process!(Right);
+            // process!(Left);
+            // process!(Home);
+            // process!(End);
+            // process!(Delete);
+            // process!(Backspace);
+            // process!(Tab);
+            // process!(Z);
+            // process!(Y);
+            // process!(C);
+            // process!(X);
+            // process!(V);
+            // process!(A);
+            // process!(Escape);
+            // process!(Enter);
 
-            if is_key_down(KeyCode::LeftControl)
-                || is_key_down(KeyCode::RightControl)
-                || is_key_pressed(KeyCode::LeftControl)
-                || is_key_pressed(KeyCode::RightControl)
-            {
-                ui.key_down(megaui::KeyCode::Control, shift, ctrl);
-            }
-            let (wheel_x, wheel_y) = mouse_wheel();
-            ui.mouse_wheel(wheel_x, -wheel_y);
+            // if is_key_down(KeyCode::LeftControl)
+            //     || is_key_down(KeyCode::RightControl)
+            //     || is_key_pressed(KeyCode::LeftControl)
+            //     || is_key_pressed(KeyCode::RightControl)
+            // {
+            //     ui.key_down(megaui::KeyCode::Control, shift, ctrl);
+            // }
+            // let (wheel_x, wheel_y) = mouse_wheel();
+            // ui.mouse_wheel(wheel_x, -wheel_y);
         }
 
         pub(crate) fn draw(&mut self, _ctx: &mut miniquad::Context, quad_gl: &mut QuadGl) {
@@ -1257,7 +1257,7 @@ pub(crate) mod ui_context {
                 let fragment_shader = FRAGMENT_SHADER.to_string();
                 let vertex_shader = VERTEX_SHADER.to_string();
 
-                load_material(
+                Material::new(
                     &vertex_shader,
                     &fragment_shader,
                     MaterialParams {
@@ -1285,7 +1285,7 @@ pub(crate) mod ui_context {
             let font_texture: Texture2D = ui.atlas.borrow_mut().texture();
             quad_gl.texture(Some(font_texture));
 
-            gl_use_material(*material);
+            gl_use_material(material);
 
             for draw_command in &ui_draw_list {
                 if let Some(texture) = draw_command.texture {

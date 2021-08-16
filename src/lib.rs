@@ -139,7 +139,6 @@ pub use miniquad;
 
 use crate::{
     color::{colors::*, Color},
-    quad_gl::QuadGl,
     ui::ui_context::UiContext,
 };
 

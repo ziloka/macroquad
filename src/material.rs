@@ -1,26 +1,181 @@
 //! Custom materials - shaders, uniforms.
 
-use crate::get_context;
-use crate::prelude::Texture2D;
-use crate::quad_gl::GlPipeline;
-use miniquad::{PipelineParams, ShaderError, UniformType};
+use crate::{get_context, texture::Texture2D, warn};
+
+use miniquad::{PipelineParams, ShaderError, UniformType, *};
+
+use std::collections::BTreeMap;
+
+#[derive(Clone, Debug)]
+pub struct Uniform {
+    name: String,
+    uniform_type: UniformType,
+    byte_offset: usize,
+}
 
 /// Material instance loaded on GPU.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Material {
-    pipeline: GlPipeline,
+    pub(crate) pipeline_2d: miniquad::Pipeline,
+    pub(crate) pipeline_3d: miniquad::Pipeline,
+    pub(crate) wants_screen_texture: bool,
+    pub(crate) uniforms: Vec<Uniform>,
+    pub(crate) uniforms_data: Vec<u8>,
+    pub(crate) textures: Vec<String>,
+    pub(crate) textures_data: BTreeMap<String, Texture>,
 }
 
 impl Material {
+    // TODO
+    pub(crate) fn new2(
+        ctx: &mut miniquad::Context,
+        shader: Shader,
+        params: PipelineParams,
+        mut uniforms: Vec<(String, UniformType)>,
+        textures: Vec<String>,
+    ) -> Result<Material, ShaderError> {
+        // TODO!
+        let wants_screen_texture = false;
+
+        let pipeline_2d = Pipeline::with_params(
+            ctx,
+            &[BufferLayout::default()],
+            &[
+                VertexAttribute::new("position", VertexFormat::Float3),
+                VertexAttribute::new("texcoord", VertexFormat::Float2),
+                VertexAttribute::new("color0", VertexFormat::Byte4),
+            ],
+            shader,
+            params,
+        );
+
+        let pipeline_3d = Pipeline::with_params(
+            ctx,
+            &[
+                BufferLayout::default(),
+                BufferLayout::default(),
+                BufferLayout::default(),
+            ],
+            &[
+                VertexAttribute::with_buffer("in_position", VertexFormat::Float3, 0),
+                VertexAttribute::with_buffer("in_uv", VertexFormat::Float2, 1),
+                VertexAttribute::with_buffer("in_normal", VertexFormat::Float3, 2),
+            ],
+            shader,
+            params,
+        );
+
+        let mut max_offset = 0;
+
+        for (name, kind) in shader::uniforms().into_iter().rev() {
+            uniforms.insert(0, (name.to_owned(), kind));
+        }
+
+        let uniforms = uniforms
+            .iter()
+            .scan(0, |offset, uniform| {
+                let uniform_byte_size = uniform.1.size();
+                let uniform = Uniform {
+                    name: uniform.0.clone(),
+                    uniform_type: uniform.1,
+                    byte_offset: *offset,
+                };
+                *offset += uniform_byte_size;
+                max_offset = *offset;
+
+                Some(uniform)
+            })
+            .collect();
+
+        Ok(Material {
+            pipeline_2d,
+            pipeline_3d,
+            wants_screen_texture,
+            uniforms,
+            uniforms_data: vec![0; max_offset],
+            textures,
+            textures_data: BTreeMap::new(),
+        })
+    }
+
+    pub fn new(
+        vertex_shader: &str,
+        fragment_shader: &str,
+        params: MaterialParams,
+    ) -> Result<Material, ShaderError> {
+        let ctx = &mut get_context().quad_context;
+
+        let shader = Shader::new(ctx, vertex_shader, fragment_shader, shader::meta()).unwrap();
+
+        Self::new2(
+            ctx,
+            shader,
+            params.pipeline_params,
+            params.uniforms,
+            params.textures,
+        )
+    }
+
     /// Set GPU uniform value for this material.
     /// "name" should be from "uniforms" list used for material creation.
     /// Otherwise uniform value would be silently ignored.
-    pub fn set_uniform<T>(&self, name: &str, uniform: T) {
-        //get_context().gl.set_uniform(self.pipeline, name, uniform);
+    pub fn set_uniform<T>(&mut self, name: &str, uniform: T) {
+        let uniform_meta = self.uniforms.iter().find(
+            |Uniform {
+                 name: uniform_name, ..
+             }| uniform_name == name,
+        );
+        if uniform_meta.is_none() {
+            warn!("Trying to set non-existing uniform: {}", name);
+            return;
+        }
+        let uniform_meta = uniform_meta.unwrap();
+        let uniform_format = uniform_meta.uniform_type;
+        let uniform_byte_size = uniform_format.size();
+        let uniform_byte_offset = uniform_meta.byte_offset;
+
+        if std::mem::size_of::<T>() != uniform_byte_size {
+            warn!(
+                "Trying to set uniform {} sized {} bytes value of {} bytes",
+                name,
+                std::mem::size_of::<T>(),
+                uniform_byte_size
+            );
+            return;
+        }
+        macro_rules! transmute_uniform {
+            ($uniform_size:expr, $byte_offset:expr, $n:expr) => {
+                if $uniform_size == $n {
+                    let data: [u8; $n] = unsafe { std::mem::transmute_copy(&uniform) };
+
+                    for i in 0..$uniform_size {
+                        self.uniforms_data[$byte_offset + i] = data[i];
+                    }
+                }
+            };
+        }
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 4);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 8);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 12);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 16);
+        transmute_uniform!(uniform_byte_size, uniform_byte_offset, 64);
     }
 
-    pub fn set_texture(&self, name: &str, texture: Texture2D) {
-        //get_context().gl.set_texture(self.pipeline, name, texture);
+    pub fn set_texture(&mut self, name: &str, texture: Texture2D) {
+        self.textures
+            .iter()
+            .find(|x| *x == name)
+            .unwrap_or_else(|| {
+                panic!(
+                    "can't find texture with name '{}', there are only this names: {:?}",
+                    name, self.textures
+                )
+            });
+
+        *self
+            .textures_data
+            .entry(name.to_owned())
+            .or_insert(texture.texture) = texture.texture;
     }
 
     /// Delete this material. Using deleted material for either rendering
@@ -50,33 +205,13 @@ impl Default for MaterialParams {
         MaterialParams {
             pipeline_params: Default::default(),
             uniforms: vec![],
-            textures: vec![],
+            textures: vec!["Texture".to_string()],
         }
     }
 }
 
-pub fn load_material(
-    vertex_shader: &str,
-    fragment_shader: &str,
-    params: MaterialParams,
-) -> Result<Material, ShaderError> {
-    let context = &mut get_context();
-
-    // let pipeline = context.gl.make_pipeline(
-    //     &mut context.quad_context,
-    //     vertex_shader,
-    //     fragment_shader,
-    //     params.pipeline_params,
-    //     params.uniforms,
-    //     params.textures,
-    // )?;
-
-    // Ok(Material { pipeline })
-    unimplemented!()
-}
-
 /// All following macroquad rendering calls will use the given material.
-pub fn gl_use_material(material: Material) {
+pub fn gl_use_material(material: &Material) {
     //get_context().gl.pipeline(Some(material.pipeline));
     unimplemented!()
 }
@@ -200,5 +335,56 @@ qwe
         );
 
         assert_eq!(result, preprocessed);
+    }
+}
+
+mod shader {
+    use miniquad::{ShaderMeta, UniformBlockLayout, UniformDesc, UniformType};
+
+    pub const VERTEX: &str = r#"#version 100
+    attribute vec3 position;
+    attribute vec2 texcoord;
+    attribute vec4 color0;
+
+    varying lowp vec2 uv;
+    varying lowp vec4 color;
+
+    uniform mat4 Model;
+    uniform mat4 Projection;
+
+    void main() {
+        gl_Position = Projection * Model * vec4(position, 1);
+        color = color0 / 255.0;
+        uv = texcoord;
+    }"#;
+
+    pub const FRAGMENT: &str = r#"#version 100
+    varying lowp vec4 color;
+    varying lowp vec2 uv;
+
+    uniform sampler2D Texture;
+
+    void main() {
+        gl_FragColor = color * texture2D(Texture, uv) ;
+    }"#;
+
+    pub fn uniforms() -> Vec<(&'static str, UniformType)> {
+        vec![
+            ("Projection", UniformType::Mat4),
+            ("Model", UniformType::Mat4),
+            ("_Time", UniformType::Float4),
+        ]
+    }
+
+    pub fn meta() -> ShaderMeta {
+        ShaderMeta {
+            images: vec!["Texture".to_string(), "_ScreenTexture".to_string()],
+            uniforms: UniformBlockLayout {
+                uniforms: uniforms()
+                    .into_iter()
+                    .map(|(name, kind)| UniformDesc::new(name, kind))
+                    .collect(),
+            },
+        }
     }
 }

@@ -3,7 +3,8 @@ use crate::{
     color::Color,
     file::{load_file, FileError},
     get_context,
-    math::{vec3, Mat4, Rect},
+    material::Material,
+    math::{vec2, vec3, Mat4, Rect},
     window::miniquad::*,
 };
 
@@ -32,6 +33,12 @@ pub async fn load_model(path: &str) -> Result<Model, FileError> {
         .map(|ix| ix as u16)
         .collect::<Vec<_>>();
     let vertices: Vec<[f32; 3]> = reader.read_positions().unwrap().collect::<Vec<_>>();
+    let uvs: Vec<[f32; 2]> = reader
+        .read_tex_coords(0)
+        .unwrap()
+        .into_f32()
+        .collect::<Vec<_>>();
+
     let normals: Vec<[f32; 3]> = reader.read_normals().unwrap().collect::<Vec<_>>();
 
     //println!("{:#?}", vertices);
@@ -39,25 +46,61 @@ pub async fn load_model(path: &str) -> Result<Model, FileError> {
     let ctx = &mut get_context().quad_context;
     let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
     let normals_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &normals);
+    let uvs_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &uvs);
     let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
     let bindings = Bindings {
-        vertex_buffers: vec![vertex_buffer, normals_buffer],
+        vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer],
         index_buffer,
-        images: vec![],
+        images: vec![Texture::empty(), Texture::empty()],
     };
 
     Ok(Model { bindings })
 }
 
-use crate::quad_gl::QuadGl;
+pub fn square() -> Model {
+    let ctx = &mut get_context().quad_context;
 
-pub struct SpriteLayer {
-    gl: QuadGl,
-    render_state: RenderState,
+    let width = 1.0;
+    let height = 1.0;
+    let length = 1.0;
+    let indices = [0u16, 1, 2, 0, 2, 3];
+
+    let vertices = [
+        vec3(-width / 2., height / 2., -length / 2.),
+        vec3(-width / 2., height / 2., length / 2.),
+        vec3(width / 2., height / 2., length / 2.),
+        vec3(width / 2., height / 2., -length / 2.),
+    ];
+    let uvs = [vec2(0., 1.), vec2(0., 0.), vec2(1., 0.), vec2(1., 1.)];
+    let normals = [
+        vec3(0., 1., 0.),
+        vec3(0., 1., 0.),
+        vec3(0., 1., 0.),
+        vec3(0., 1., 0.),
+    ];
+
+    let vertex_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &vertices);
+    let normals_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &normals);
+    let uvs_buffer = Buffer::immutable(ctx, BufferType::VertexBuffer, &uvs);
+    let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
+    let bindings = Bindings {
+        vertex_buffers: vec![vertex_buffer, uvs_buffer, normals_buffer],
+        index_buffer,
+        images: vec![Texture::empty(), Texture::empty()],
+    };
+
+    Model { bindings }
 }
 
-impl SpriteLayer {
-    pub fn new(mut gl: QuadGl, render_state: RenderState) -> SpriteLayer {
+use crate::quad_gl::QuadGl;
+
+pub struct SpriteLayer<'a> {
+    gl: QuadGl,
+    render_state: &'a RenderState,
+}
+
+impl<'a> SpriteLayer<'a> {
+    pub fn new(mut gl: QuadGl, render_state: &'a RenderState) -> SpriteLayer<'a> {
         SpriteLayer { gl, render_state }
     }
 
@@ -69,7 +112,7 @@ impl SpriteLayer {
 pub struct SceneGraph {
     models: Vec<(Model, Mat4)>,
     layers_cache: Vec<QuadGl>,
-    pipeline: miniquad::Pipeline,
+    default_material: Material,
 }
 
 impl SceneGraph {
@@ -77,25 +120,23 @@ impl SceneGraph {
         let shader = Shader::new(ctx, shader::VERTEX, shader::FRAGMENT, shader::meta())
             .unwrap_or_else(|e| panic!("Failed to load shader: {}", e));
 
-        let pipeline = Pipeline::with_params(
+        let default_material = Material::new2(
             ctx,
-            &[BufferLayout::default(), BufferLayout::default()],
-            &[
-                VertexAttribute::with_buffer("position", VertexFormat::Float3, 0),
-                VertexAttribute::with_buffer("normal", VertexFormat::Float3, 1),
-            ],
             shader,
             PipelineParams {
                 depth_test: Comparison::LessOrEqual,
                 depth_write: true,
                 ..Default::default()
             },
-        );
+            vec![],
+            vec![],
+        )
+        .unwrap();
 
         SceneGraph {
             models: vec![],
             layers_cache: vec![QuadGl::new(ctx), QuadGl::new(ctx), QuadGl::new(ctx)],
-            pipeline,
+            default_material,
         }
     }
 
@@ -104,8 +145,12 @@ impl SceneGraph {
         self.models.len() - 1
     }
 
-    pub fn sprite_layer(&mut self, render_state: RenderState) -> SpriteLayer {
-        SpriteLayer::new(self.layers_cache.pop().unwrap(), render_state)
+    pub fn sprite_layer<'a>(&mut self, render_state: &'a RenderState) -> SpriteLayer<'a> {
+        let mut gl = self.layers_cache.pop().unwrap();
+        let render_pass = render_state.render_target.map(|rt| rt.render_pass);
+        gl.render_pass(render_pass);
+
+        SpriteLayer::new(gl, render_state)
     }
 
     pub fn clear(&mut self, color: Color) {
@@ -133,13 +178,14 @@ impl SceneGraph {
 
         let (width, height) = context.screen_size();
 
-        let screen_mat = glam::Mat4::orthographic_rh_gl(0., width, height, 0., -1., 1.);
+        let screen_mat = //glam::Mat4::orthographic_rh_gl(0., width, height, 0., -1., 1.);
+            canvas.render_state.matrix();
         canvas.gl().draw(context, screen_mat);
 
         self.layers_cache.push(canvas.gl);
     }
 
-    pub fn draw_model(&mut self, render_state: &RenderState, model: &Model, transform: Mat4) {
+    pub fn draw_model(&mut self, render_state: &mut RenderState, model: &Model, transform: Mat4) {
         // unsafe {
         //     miniquad::gl::glPolygonMode(miniquad::gl::GL_FRONT_AND_BACK, miniquad::gl::GL_LINE);
         // }
@@ -153,13 +199,42 @@ impl SceneGraph {
             ctx.begin_default_pass(PassAction::Nothing);
         }
 
-        ctx.apply_pipeline(&self.pipeline);
+        if let Some(ref material) = render_state.material {
+            ctx.apply_pipeline(&material.pipeline_3d);
+        } else {
+            ctx.apply_pipeline(&self.default_material.pipeline_3d);
+        }
 
-        ctx.apply_bindings(&model.bindings);
-        ctx.apply_uniforms(&shader::Uniforms {
-            projection: render_state.matrix(),
-            model: transform,
-        });
+        let mut bindings = model.bindings.clone();
+        if let Some(ref mut material) = render_state.material {
+            bindings.images[0] = material
+                .textures_data
+                .get("Texture")
+                .copied()
+                .unwrap_or_else(|| Texture::empty())
+        }
+        ctx.apply_bindings(&bindings);
+
+        let projection = render_state.matrix();
+        let time = (crate::time::get_time()) as f32;
+        let time = glam::vec4(time, time.sin(), time.cos(), 0.);
+
+        if let Some(ref mut material) = render_state.material {
+            material.set_uniform("Projection", projection);
+            material.set_uniform("Model", transform);
+            material.set_uniform("_Time", time);
+
+            ctx.apply_uniforms_from_bytes(
+                material.uniforms_data.as_ptr(),
+                material.uniforms_data.len(),
+            );
+        } else {
+            ctx.apply_uniforms(&shader::Uniforms {
+                projection,
+                model: transform,
+            });
+        }
+
         ctx.draw(0, model.bindings.index_buffer.size() as i32 / 2, 1);
 
         ctx.end_render_pass();
@@ -178,29 +253,40 @@ mod shader {
     use miniquad::{ShaderMeta, UniformBlockLayout, UniformDesc, UniformType};
 
     pub const VERTEX: &str = r#"#version 100
-    attribute vec3 position;
-    attribute vec3 normal;
+    attribute vec3 in_position;
+    attribute vec2 in_uv;
+    attribute vec3 in_normal;
 
-    varying lowp vec4 color;
+    varying lowp vec4 out_color;
+    varying lowp vec2 out_uv;
 
     uniform mat4 Model;
     uniform mat4 Projection;
 
     void main() {
-        color = vec4(dot(normal, vec3(0.0, 1.0, 0.0)), dot(normal, vec3(0.0, -1.0, 0.0)), dot(normal, vec3(-0.2, -0.8, -0.3)), 1);
-        gl_Position = Projection * Model * vec4(position, 1);
+        out_color = vec4(dot(in_normal, vec3(0.0, 1.0, 0.0)), dot(in_normal, vec3(0.0, -1.0, 0.0)), dot(in_normal, vec3(-0.2, -0.8, -0.3)), 1);
+        gl_Position = Projection * Model * vec4(in_position, 1);
+        out_uv = in_uv;
     }"#;
 
     pub const FRAGMENT: &str = r#"#version 100
-    varying lowp vec4 color;
+    varying lowp vec4 out_color;
+    varying lowp vec2 out_uv;
+
+    lowp float chessboard(lowp vec2 uv)
+    {
+	uv = floor(uv * 2.0);
+    
+        return mod(uv.x + uv.y, 2.0);
+    }
 
     void main() {
-        gl_FragColor = vec4(1.0, 0.0, 0.0, 1) * (max(color.x, 0.0) + max(color.y, 0.0));
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 1) * (max(out_color.x, 0.0) + max(out_color.y, 0.0));
     }"#;
 
     pub fn meta() -> ShaderMeta {
         ShaderMeta {
-            images: vec![],
+            images: vec!["Texture".to_string()],
             uniforms: UniformBlockLayout {
                 uniforms: vec![
                     UniformDesc::new("Projection", UniformType::Mat4),
